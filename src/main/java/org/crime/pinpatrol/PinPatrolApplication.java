@@ -7,7 +7,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class PinPatrolApplication {
 
     public static void main(String[] args) {
+
         SpringApplication.run(PinPatrolApplication.class, args);
+        System.out.println("Working");
     }
 
 }
