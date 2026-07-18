@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -61,6 +62,15 @@ public class AuthController {
         issueCookie(response, user);
 
         return ResponseEntity.ok(new AuthResponse(user.getId(), user.getEmail(), user.getRole().name()));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> me(@AuthenticationPrincipal JwtAuthFilter.AuthenticatedUser principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ErrorResponse("Not signed in"));
+        }
+        return ResponseEntity.ok(new AuthResponse(principal.userId(), principal.email(), principal.role()));
     }
 
     @PostMapping("/logout")
