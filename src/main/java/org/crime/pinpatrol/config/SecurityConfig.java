@@ -52,6 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/dashboard/**").hasRole("OFFICER")
                         .requestMatchers("/api/media/signature").authenticated()
                         .anyRequest().authenticated()
+
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
