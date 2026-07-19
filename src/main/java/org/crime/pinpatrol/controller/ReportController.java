@@ -12,7 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import java.util.List;
 
 @RestController
@@ -21,11 +21,14 @@ public class ReportController {
 
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public ReportController(ReportRepository reportRepository, UserRepository userRepository) {
+    public ReportController(ReportRepository reportRepository, UserRepository userRepository, SimpMessagingTemplate messagingTemplate) {
         this.reportRepository = reportRepository;
         this.userRepository = userRepository;
+        this.messagingTemplate = messagingTemplate;
     }
+
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -75,6 +78,8 @@ public class ReportController {
 
         Report saved = reportRepository.save(report);
 
+        ReportResponse response = ReportResponse.from(saved);
+        messagingTemplate.convertAndSend("/topic/reports", response);
         return ResponseEntity.status(HttpStatus.CREATED).body(ReportResponse.from(saved));
     }
 
