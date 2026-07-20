@@ -15,8 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-import org.crime.pinpatrol.model.ReportMedia;
-import org.crime.pinpatrol.service.GeminiVisionService;
+import org.crime.pinpatrol.service.VisionService;
 
 import java.util.Map;
 import java.util.TreeMap;
@@ -119,21 +118,21 @@ public class MediaController {
                     .body(new ErrorResponse("AI description currently only supports images"));
         }
 
-        String description = geminiVisionService.describeImage(media.getUrl());
+        String description = visionService.describeImage(media.getUrl());
         media.setAiDescription(description);
         ReportMedia saved = reportMediaRepository.save(media);
 
         return ResponseEntity.ok(MediaResponse.from(saved));
     }
 
-    private final GeminiVisionService geminiVisionService;
+    private final VisionService visionService;
 
     public MediaController(Cloudinary cloudinary, ReportRepository reportRepository,
-                           ReportMediaRepository reportMediaRepository, GeminiVisionService geminiVisionService) {
+                           ReportMediaRepository reportMediaRepository, VisionService visionService) {
         this.cloudinary = cloudinary;
         this.reportRepository = reportRepository;
         this.reportMediaRepository = reportMediaRepository;
-        this.geminiVisionService = geminiVisionService;
+        this.visionService = visionService;
     }
 
     public record ErrorResponse(String message) {}
