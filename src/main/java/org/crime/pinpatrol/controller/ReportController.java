@@ -7,10 +7,13 @@ import org.crime.pinpatrol.dto.UpdateStatusRequest;
 import org.crime.pinpatrol.dto.VerifyReportRequest;
 import org.crime.pinpatrol.model.Report;
 import org.crime.pinpatrol.model.ReportLink;
+import org.crime.pinpatrol.model.ReportMedia;
 import org.crime.pinpatrol.repository.ReportLinkRepository;
+import org.crime.pinpatrol.repository.ReportMediaRepository;
 import org.crime.pinpatrol.repository.ReportRepository;
 import org.crime.pinpatrol.repository.UserRepository;
 import org.crime.pinpatrol.security.JwtAuthFilter.AuthenticatedUser;
+import org.crime.pinpatrol.service.ReportInsightService;
 import org.crime.pinpatrol.util.GeoUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,22 +24,37 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 
 @RestController
 @RequestMapping("/api/reports")
 public class ReportController {
+    private final ReportMediaRepository reportMediaRepository;
+
 
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final ReportLinkRepository reportLinkRepository;
+    private final ReportInsightService reportInsightService;
 
-    public ReportController(ReportRepository reportRepository, UserRepository userRepository,
-                            SimpMessagingTemplate messagingTemplate, ReportLinkRepository reportLinkRepository) {
+    public ReportController(
+            ReportRepository reportRepository,
+            UserRepository userRepository,
+            SimpMessagingTemplate messagingTemplate,
+            ReportLinkRepository reportLinkRepository,
+            ReportInsightService reportInsightService,
+            ReportMediaRepository reportMediaRepository
+    ) {
         this.reportRepository = reportRepository;
         this.userRepository = userRepository;
         this.messagingTemplate = messagingTemplate;
         this.reportLinkRepository = reportLinkRepository;
+        this.reportInsightService = reportInsightService;
+        this.reportMediaRepository = reportMediaRepository;
     }
 
     @GetMapping
@@ -84,8 +102,13 @@ public class ReportController {
 
         Report saved = reportRepository.save(report);
 
-        List<Report> candidates = reportRepository.findAllByCategoryAndIdNotAndCreatedAtGreaterThanEqual(
-                saved.getCategory(), saved.getId(), LocalDateTime.now().minusMinutes(60));
+
+        List<Report> candidates = reportRepository.findAll()
+                .stream()
+                .filter(r -> !r.getId().equals(saved.getId()))
+                .filter(r -> r.getCategory() == saved.getCategory())
+                .toList();
+
 
         for (Report candidate : candidates) {
             double distance = GeoUtils.distanceMeters(saved.getLat(), saved.getLng(), candidate.getLat(), candidate.getLng());
@@ -100,6 +123,43 @@ public class ReportController {
                         .build();
                 reportLinkRepository.save(link);
             }
+        }
+
+        List<ReportInsightService.SimilarMatch> similarMatches =
+                reportInsightService.findSimilar(saved, candidates);
+
+
+        Map<Long, Report> candidateMap = candidates.stream()
+                .collect(Collectors.toMap(
+                        Report::getId,
+                        Function.identity()
+                ));
+
+        for (ReportInsightService.SimilarMatch match : similarMatches) {
+
+            Report candidate = candidateMap.get(match.id());
+
+            if (candidate == null)
+                continue;
+
+            boolean alreadyExists =
+                    reportLinkRepository.existsByReportAndRelatedReportAndLinkType(
+                            saved,
+                            candidate,
+                            ReportLink.LinkType.SIMILAR
+                    );
+
+            if (alreadyExists)
+                continue;
+
+            ReportLink link = ReportLink.builder()
+                    .report(saved)
+                    .relatedReport(candidate)
+                    .linkType(ReportLink.LinkType.SIMILAR)
+                    .aiReason(match.reason())
+                    .build();
+
+            reportLinkRepository.save(link);
         }
 
         ReportResponse response = ReportResponse.from(saved);
@@ -131,6 +191,35 @@ public class ReportController {
 
         Report saved = reportRepository.save(report);
         return ResponseEntity.ok(ReportResponse.from(saved));
+    }
+
+    @GetMapping("/{id}/summary")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getCaseSummary(@PathVariable Long id) {
+
+        Report report = reportRepository.findById(id).orElse(null);
+
+        if (report == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("Report not found"));
+        }
+
+        List<ReportMedia> media =
+                reportMediaRepository.findAllByReport_Id(id);
+
+        List<ReportLink> links =
+                reportLinkRepository.findAllByReport_IdOrRelatedReport_Id(id, id);
+
+        String summary =
+                reportInsightService.summarizeCase(report, media, links);
+
+        report.setAiCaseBrief(summary);
+        reportRepository.save(report);
+
+        return ResponseEntity.ok(Map.of(
+                "reportId", report.getId(),
+                "summary", summary
+        ));
     }
 
     @PatchMapping("/{id}/status")
