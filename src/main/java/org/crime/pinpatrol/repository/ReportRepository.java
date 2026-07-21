@@ -2,12 +2,15 @@ package org.crime.pinpatrol.repository;
 import org.crime.pinpatrol.model.Report;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import org.springframework.data.domain.Pageable;
 import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ReportRepository extends JpaRepository<Report, Long> {
 
     List<Report> findAllByOrderByCreatedAtDesc();
+
+    List<Report> findAllByIdNot(Long id, Pageable pageable);
 
     List<Report> findAllByVerificationStatusOrderByCreatedAtDesc(Report.VerificationStatus verificationStatus);
 
