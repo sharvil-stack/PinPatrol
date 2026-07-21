@@ -3,5 +3,8 @@ package org.crime.pinpatrol.repository;
 import org.crime.pinpatrol.model.ReportMedia;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
+
 public interface ReportMediaRepository extends JpaRepository<ReportMedia,Long> {
+    List<ReportMedia> findAllByReport_Id(Long reportId);
 }

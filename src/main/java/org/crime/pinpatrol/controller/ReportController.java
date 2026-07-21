@@ -7,7 +7,9 @@ import org.crime.pinpatrol.dto.UpdateStatusRequest;
 import org.crime.pinpatrol.dto.VerifyReportRequest;
 import org.crime.pinpatrol.model.Report;
 import org.crime.pinpatrol.model.ReportLink;
+import org.crime.pinpatrol.model.ReportMedia;
 import org.crime.pinpatrol.repository.ReportLinkRepository;
+import org.crime.pinpatrol.repository.ReportMediaRepository;
 import org.crime.pinpatrol.repository.ReportRepository;
 import org.crime.pinpatrol.repository.UserRepository;
 import org.crime.pinpatrol.security.JwtAuthFilter.AuthenticatedUser;
@@ -26,9 +28,12 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+
 @RestController
 @RequestMapping("/api/reports")
 public class ReportController {
+    private final ReportMediaRepository reportMediaRepository;
+
 
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
@@ -36,14 +41,20 @@ public class ReportController {
     private final ReportLinkRepository reportLinkRepository;
     private final ReportInsightService reportInsightService;
 
-    public ReportController(ReportRepository reportRepository, UserRepository userRepository,
-                            SimpMessagingTemplate messagingTemplate, ReportLinkRepository reportLinkRepository,
-                            ReportInsightService reportInsightService) {
+    public ReportController(
+            ReportRepository reportRepository,
+            UserRepository userRepository,
+            SimpMessagingTemplate messagingTemplate,
+            ReportLinkRepository reportLinkRepository,
+            ReportInsightService reportInsightService,
+            ReportMediaRepository reportMediaRepository
+    ) {
         this.reportRepository = reportRepository;
         this.userRepository = userRepository;
         this.messagingTemplate = messagingTemplate;
         this.reportLinkRepository = reportLinkRepository;
         this.reportInsightService = reportInsightService;
+        this.reportMediaRepository = reportMediaRepository;
     }
 
     @GetMapping
@@ -180,6 +191,35 @@ public class ReportController {
 
         Report saved = reportRepository.save(report);
         return ResponseEntity.ok(ReportResponse.from(saved));
+    }
+
+    @GetMapping("/{id}/summary")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getCaseSummary(@PathVariable Long id) {
+
+        Report report = reportRepository.findById(id).orElse(null);
+
+        if (report == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("Report not found"));
+        }
+
+        List<ReportMedia> media =
+                reportMediaRepository.findAllByReport_Id(id);
+
+        List<ReportLink> links =
+                reportLinkRepository.findAllByReport_IdOrRelatedReport_Id(id, id);
+
+        String summary =
+                reportInsightService.summarizeCase(report, media, links);
+
+        report.setAiCaseBrief(summary);
+        reportRepository.save(report);
+
+        return ResponseEntity.ok(Map.of(
+                "reportId", report.getId(),
+                "summary", summary
+        ));
     }
 
     @PatchMapping("/{id}/status")
