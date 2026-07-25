@@ -14,7 +14,7 @@ A full-stack civic incident-reporting platform. Citizens drop pins on a live map
   - **Similar-incident detection** across historical reports (LLM-based)
   - **Case brief generation** — AI-written summary of a report and its related incidents
   - **Media description** — automatic captioning of uploaded images/video for triage context
-- **Media uploads** via Cloudinary.
+- **Media uploads** — signed, direct-to-Cloudinary upload flow (the backend never proxies file bytes; it only issues a signed payload and later registers the resulting URL).
 
 ## Tech Stack
 
@@ -140,9 +140,16 @@ Runs on `http://localhost:5173` (pinned via `vite.config.js`; the backend's CORS
 | POST | `/api/reports/{id}/related` | Authenticated | AI similar-incident detection; returns all linked reports |
 | PATCH | `/api/reports/{id}/verify` | Officer | Approve/reject a pending report |
 | PATCH | `/api/reports/{id}/status` | Officer | Update operational status (open/in-progress/resolved) |
-| POST | `/api/reports/{reportId}/media/{mediaId}/describe` | Authenticated | AI image/media description |
+| GET | `/api/media/signature` | Authenticated | Issues a signed Cloudinary upload payload (timestamp, signature, folder) |
+| POST | `/api/reports/{id}/media` | Owner or Officer | Registers an uploaded Cloudinary URL against a report |
+| POST | `/api/reports/{reportId}/media/{mediaId}/describe` | Owner or Officer | AI image/media description |
 | GET | `/api/dashboard/stats` | Officer | Aggregate stats for the triage dashboard |
 
+## Roadmap
+
+- [ ] Deployment (Render: backend web service, frontend static site, managed MySQL)
+- [ ] CI/CD via GitHub Actions
+- [ ] Gray-out (rather than hide) pending reports on the public map
 
 ## License
 
