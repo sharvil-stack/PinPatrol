@@ -1,5 +1,6 @@
 import api from "./api";
 
+
 export const login = async (email, password) => {
   const response = await api.post("/api/auth/login", {
     email,
@@ -16,5 +17,10 @@ export const signup = async (user) => {
 
 export const getCurrentUser = async () => {
   const response = await api.get("/api/auth/me");
+  return response.data;
+};
+
+export const logout = async () => {
+  const response = await api.post("/api/auth/logout");
   return response.data;
 };

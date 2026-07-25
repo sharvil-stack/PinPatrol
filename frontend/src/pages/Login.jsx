@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { login } from "../services/authService";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,18 +21,13 @@ function Login() {
     try {
       const user = await login(email, password);
 
-      console.log(user);
-
       if (user.role === "OFFICER") {
         navigate("/dashboard");
       } else {
         navigate("/map");
       }
-
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Login failed"
-      );
+      setError(err.response?.data?.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -40,7 +36,6 @@ function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0B1220] px-4">
       <div className="w-full max-w-md rounded-2xl bg-slate-900 p-8 shadow-lg">
-
         <h1 className="mb-8 text-center text-3xl font-bold text-white">
           Login
         </h1>
@@ -52,7 +47,6 @@ function Login() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-
           <input
             type="email"
             placeholder="Email"
@@ -75,22 +69,18 @@ function Login() {
           >
             {loading ? "Logging in..." : "Login"}
           </button>
-
         </form>
 
         <p className="mt-6 text-center text-slate-400">
           Don't have an account?{" "}
-          <Link
-            to="/signup"
-            className="text-orange-500"
-          >
+          <Link to="/signup" className="text-orange-500">
             Sign Up
           </Link>
         </p>
-
       </div>
     </div>
   );
 }
+
 
 export default Login;
