@@ -8,7 +8,7 @@ import { listReports, createReport, getNearbyReports } from "../services/reportS
 import { subscribeToReports } from "../services/socket";
 import { severityDotColor } from "../utils/reportStyles";
 
-const DEFAULT_CENTER = [18.5204, 73.8567]; // Pune, as a sensible default center
+const DEFAULT_CENTER = [18.5204, 73.8567]; 
 const NEARBY_RADIUS_KM = 1;
 
 function ClickCatcher({ onClick }) {
@@ -26,10 +26,9 @@ function LiveMap() {
   const [error, setError] = useState("");
   const [placing, setPlacing] = useState(false);
   const [pendingPosition, setPendingPosition] = useState(null);
-  const [viewMode, setViewMode] = useState("pins"); // "pins" | "heatmap"
+  const [viewMode, setViewMode] = useState("pins"); 
 
-  // Nearby-search state: click anywhere (when not placing a new report) to see
-  // incidents within NEARBY_RADIUS_KM of that point.
+  
   const [nearbyCenter, setNearbyCenter] = useState(null);
   const [nearbyResults, setNearbyResults] = useState([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
@@ -88,7 +87,7 @@ function LiveMap() {
   const handleSubmit = async (payload) => {
     const created = await createReport(payload);
     setReports((prev) => [created, ...prev]);
-    setPendingPosition(null);
+    return created;
   };
 
   return (
