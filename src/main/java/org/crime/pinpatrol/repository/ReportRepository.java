@@ -3,6 +3,9 @@ import org.crime.pinpatrol.model.Report;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,6 +27,16 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
 
     List<Report> findAllByCategoryAndIdNotAndCreatedAtGreaterThanEqual(
             String category, Long id, LocalDateTime createdAt
+    );
+    @Query(value = """
+            SELECT * FROM reports r
+            WHERE ST_Distance_Sphere(r.location, ST_SRID(POINT(:lng, :lat), 4326)) <= :radiusMeters
+            ORDER BY ST_Distance_Sphere(r.location, ST_SRID(POINT(:lng, :lat), 4326)) ASC
+            """, nativeQuery = true)
+    List<Report> findNearby(
+            @Param("lat") double lat,
+            @Param("lng") double lng,
+            @Param("radiusMeters") double radiusMeters
     );
 
 

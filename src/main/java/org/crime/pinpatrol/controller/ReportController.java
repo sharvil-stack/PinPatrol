@@ -1,10 +1,7 @@
 package org.crime.pinpatrol.controller;
 
 import jakarta.validation.Valid;
-import org.crime.pinpatrol.dto.CreateReportRequest;
-import org.crime.pinpatrol.dto.ReportResponse;
-import org.crime.pinpatrol.dto.UpdateStatusRequest;
-import org.crime.pinpatrol.dto.VerifyReportRequest;
+import org.crime.pinpatrol.dto.*;
 import org.crime.pinpatrol.model.Report;
 import org.crime.pinpatrol.model.ReportLink;
 import org.crime.pinpatrol.model.ReportMedia;
@@ -15,6 +12,8 @@ import org.crime.pinpatrol.repository.UserRepository;
 import org.crime.pinpatrol.security.JwtAuthFilter.AuthenticatedUser;
 import org.crime.pinpatrol.service.ReportInsightService;
 import org.crime.pinpatrol.util.GeoUtils;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -220,6 +219,67 @@ public class ReportController {
                 "reportId", report.getId(),
                 "summary", summary
         ));
+    }
+
+    @PostMapping("/{id}/related")
+    @Transactional
+    public ResponseEntity<?> findRelated(@PathVariable Long id) {
+        Report target = reportRepository.findById(id).orElse(null);
+        if (target == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("Report not found"));
+        }
+
+        List<Report> candidates = reportRepository.findAllByIdNot(
+                id, PageRequest.of(0, 20, Sort.by("createdAt").descending())
+        );
+
+        List<ReportInsightService.SimilarMatch> matches = reportInsightService.findSimilar(target, candidates);
+
+        Map<Long, Report> candidateMap = candidates.stream()
+                .collect(Collectors.toMap(Report::getId, Function.identity()));
+
+        for (ReportInsightService.SimilarMatch match : matches) {
+            Report candidate = candidateMap.get(match.id());
+            if (candidate == null) continue;
+
+            boolean alreadyLinked = reportLinkRepository.existsByReportAndRelatedReportAndLinkType(
+                    target, candidate, ReportLink.LinkType.SIMILAR
+            ) || reportLinkRepository.existsByReportAndRelatedReportAndLinkType(
+                    candidate, target, ReportLink.LinkType.SIMILAR
+            );
+            if (alreadyLinked) continue;
+
+            ReportLink link = ReportLink.builder()
+                    .report(target)
+                    .relatedReport(candidate)
+                    .linkType(ReportLink.LinkType.SIMILAR)
+                    .aiReason(match.reason())
+                    .build();
+            reportLinkRepository.save(link);
+        }
+
+        List<ReportLink> allLinks = reportLinkRepository.findAllByReport_IdOrRelatedReport_Id(id, id);
+        List<ReportLinkResponse> response = allLinks.stream()
+                .map(link -> ReportLinkResponse.from(link, id))
+                .toList();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/nearby")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> findNearby(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "1") double radiusKm
+    ) {
+        double radiusMeters = radiusKm * 1000;
+        List<ReportResponse> nearby = reportRepository.findNearby(lat, lng, radiusMeters)
+                .stream()
+                .map(ReportResponse::from)
+                .toList();
+
+        return ResponseEntity.ok(nearby);
     }
 
     @PatchMapping("/{id}/status")
